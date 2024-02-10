@@ -43,9 +43,9 @@ void Flag::handleDrop(Flag *this, BFPlayer *player, BFSoldier *playerObject) {
   Vec3 normal;
   BaseMatrix4_float mt;
 
-  dice::ref2::world::Item::handleDrop(&this->item0, player, playerObject);
+  Item::handleDrop(player, playerObject);
   player->is_tagged = 0;
-  this->item0.base.base.base.base.base.base.base.vtbl.Item->enable(this);
+  this->enable(this);
   if ( player->alive == 1 )
   {
     // If handleDrop was called with an alive player it's assumed that the player captured the flag.
