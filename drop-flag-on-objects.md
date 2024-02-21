@@ -1,8 +1,16 @@
 ## Patch for CTF flags falling trough map objects
 This patch fixes the issue that CTF flags always fall onto the map terrain, falling trough any buildings the player might stand on.
 
+*Edit on 2024-02-21: the patch has been updated to make the flag also stay above water*
+
 Flag on top of rubber pile:
+
 ![image](https://github.com/uuuzbf/bf1942-patches/assets/135877649/445c5e0a-759e-4082-b1d0-4410d9bead38)
+
+Flag above water:
+
+![image](https://github.com/uuuzbf/bf1942-patches/assets/135877649/afa9b115-3596-4c49-aea7-2925e8bf0c11)
+
 
 ## TL;DR
 
@@ -16,7 +24,7 @@ D8 05 D0 E4 6B 08 58 8B 45 98 89 45 B8 5A 8B 45 9C 8B 55 08 89 45 BC 8B 45 A0 D9
 with these new bytes:
 
 ```
-d9 54 24 04 c7 04 24 00 02 00 02 8b 75 0c 8b 06 56 ff 50 3c 89 04 24 68 38 bb 71 08 6a 00 6a 00 d8 63 34 d9 5c 24 00 6a 00 8d 43 30 ff 70 08 ff 70 04 ff 30 83 ec 20 8d 44 24 38 50 83 e8 0c 50 83 e8 0c 50 83 e8 04 50 83 e8 0c 50 83 e8 0c 50 83 e8 04 50 a1 24 dc 71 08 50 8b 08 ff 51 48 83 c4 20 84 c0 74 06 d9 44 24 08 eb 04 d9 44 24 44 d8 05 d0 e4 6b 08 d9 5d dc 83 c4 48 8b 55 08 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90
+d9 54 24 04 c7 04 24 00 02 00 02 8B 75 0C 8B 06 56 FF 50 3C 89 04 24 68 38 bb 71 08 6a c0 50 50 d8 63 34 d9 5c 24 00 50 8d 43 30 ff 70 08 ff 70 04 ff 30 83 ec 20 8d 44 24 38 50 83 e8 0c 50 83 e8 0c 50 83 e8 04 50 83 e8 0c 50 83 e8 0c 50 83 e8 04 50 a1 24 dc 71 08 50 8b 08 ff 51 48 83 c4 20 84 c0 74 06 D9 44 24 08 eb 04 D9 44 24 44 a1 f0 35 74 08 50 8b 08 ff 51 5c dd e1 df e0 f6 c4 45 74 04 dd d8 eb 02 dd d9 d8 05 d0 e4 6b 08 D9 5D DC 83 c4 4c 8B 55 08
 ```
 
 
@@ -30,7 +38,7 @@ D8 05 D0 27 67 08 58 8B 45 98 89 45 B8 5A 8B 45 9C 8B 55 08 89 45 BC 8B 45 A0 D9
 with these new bytes:
 
 ```
-d9 54 24 04 c7 04 24 00 02 00 02 8b 75 0c 8b 06 56 ff 50 3c 89 04 24 68 38 96 6c 08 6a 00 6a 00 d8 63 34 d9 5c 24 00 6a 00 8d 43 30 ff 70 08 ff 70 04 ff 30 83 ec 20 8d 44 24 38 50 83 e8 0c 50 83 e8 0c 50 83 e8 04 50 83 e8 0c 50 83 e8 0c 50 83 e8 04 50 a1 24 b7 6c 08 50 8b 08 ff 51 48 83 c4 20 84 c0 74 06 d9 44 24 08 eb 04 d9 44 24 44 d8 05 d0 27 67 08 d9 5d dc 83 c4 48 8b 55 08 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90
+d9 54 24 04 c7 04 24 00 02 00 02 8B 75 0C 8B 06 56 FF 50 3C 89 04 24 68 38 96 6c 08 31 c0 50 50 d8 63 34 d9 5c 24 00 50 8d 43 30 ff 70 08 ff 70 04 ff 30 83 ec 20 8d 44 24 38 50 83 e8 0c 50 83 e8 0c 50 83 e8 04 50 83 e8 0c 50 83 e8 0c 50 83 e8 04 50 a1 24 b7 6c 08 50 8b 08 ff 51 48 83 c4 20 84 c0 74 06 D9 44 24 08 eb 04 D9 44 24 44 a1 f0 10 6f 08 50 8b 08 ff 51 5c dd e1 df e0 f6 c4 45 74 04 dd d8 eb 02 dd d9 d8 05 D0 27 67 08 D9 5D DC 83 c4 4c 8B 55 08
 ```
 
 ## Patch details
@@ -87,6 +95,8 @@ There is enough space to apply the patch because the original code does some cal
 
 The patch adds an extra call to `ObjectManager::intersectLine()`. This function does line tests on world objects, so it can be used to test if there is any object between where the player dropped the flag and the terrain below. `intersectLine` can also accept an `ObjectPredicator`, this is used to discard certain objects from the search. An `ExplosionPredicator` is used (nothing to do with explosions, its just used in the explosion code too) which skips `BFSoldier`s, can test if some object flags are set and can skip an additional object. The additional object will be the player's current vehicle, so the flag won't get stuck in it.
 
+To check if the resulting position is under water, `PatchTerrain::getWaterLevel()` is called, and the result is compared to the calculated height. If the height is below the water level the water level is used as height instead.
+
 Patch bytes for `bf1942_lnxded.dynamic`:
 ```c
 // terrain_height is in st(0)
@@ -108,12 +118,13 @@ Patch bytes for `bf1942_lnxded.dynamic`:
 0x89, 0x04, 0x24,               // mov [esp], eax ; predicator.ignoreObject = vehicle (replaces getVehicle argument on stack)
 0x68, 0x38, 0x96, 0x6c, 0x08,   // push 086C9638 ; predicator.vtbl for .dynamic executable, static = 0871BB38
 
-0x6a, 0x00,         // push 0 ; direction_offset.z = 0
+0x31, 0xc0,         // xor eax,eax ; eax = 0
+0x50,               // push eax ; direction_offset.z = 0
 // direction_offset.y = terrain_height - mt.pos.z
-0x6a, 0x00,         // push 0
+0x50,               // push eax ; 0
 0xd8, 0x63, 0x34,   // fsub [ebx+34h]
 0xd9, 0x5c, 0x24, 0x00, // ftsp dword [esp] ; terrain_height is no longer in fp register!
-0x6a, 0x00,         // push 0 ; direction_offset.x = 0
+0x50,               // push eax ; direction_offset.x = 0
 
 0x8d, 0x43, 0x30,   // lea eax,[ebx+30h] ; eax = mt.pos ptr
 0xff, 0x70, 0x08,   // push [eax+8] ; startpos.z = mt.pos.z
@@ -154,24 +165,36 @@ Patch bytes for `bf1942_lnxded.dynamic`:
 // object was not found:
 0xD9, 0x44, 0x24, 0x44, // fld [esp+44h] ; load saved terrain_height from stack
 
+// get water level and make sure the new height is above it
+0xa1, 0xf0, 0x10, 0x6f, 0x08, // mov eax,[086F10F0h] ; terrainBase for dynamic (static = 087435F0h)
+0x50,                   // push eax ; terrainBase (getWaterLevel this*)
+0x8b, 0x08,             // mov ecx,[eax]; vtable for PatchTerrain
+0xff, 0x51, 0x5c,       // call [ecx+5c] ; call terrainBase->getWaterLevel()
+// st(0) = water level, st(1) = height
+0xdd, 0xe1,             // fucom st(0), st(1)
+0xdf, 0xe0,             // fnstsw ax
+0xf6, 0xc4, 0x45,       // test ax,45h
+0x74, 0x04,             // jz use_water_level   ; jump if st(0) > st(1) - water_level > height
+0xdd, 0xd8,             // fstp st(0) ; pop water level from fpu
+0xeb, 0x02,             // jmp after_next_ins
+0xdd, 0xd9,             // fstp st(1) ; set height to water level and pop water level
+
 // add 1.5 to final height and store it in mt.pos.y
 0xd8, 0x05, 0xD0, 0x27, 0x67, 0x08, // fadd ds:const_flt_1_5 (add 1.5 to st(0), dynamic, static = 086BE4D0)
 0xD9, 0x5D, 0xDC,                   // fstp [ebp+mt.pos.y]  ; store new height in position
 
 // clean up stack
-0x83, 0xc4, 0x48,   // add esp,70
+0x83, 0xc4, 0x4c,   // add esp,76
 
 // prepare call to setAbsoluteTransformation
 0x8B, 0x55, 0x08,   // mov edx, [ebp+this] ; edx = this 
 
-// 127 bytes used of 152 patched bytes, 25 nops
-0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90,
-0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90,
-0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90,
+// all 152 patched bytes are used up
 
 // code continues at 08298F88 (dynamic, 08291F18 for static) 
 ```
-For the `.static` executable 3 constants (marked in comments) need to be changed:
+For the `.static` executable 4 addresses (marked in comments) need to be changed:
 - Address of `ExplosionPredicator` virtual table
 - Address of `objectManager` global
+- Address of `terrainBase` global
 - Address of float const `1.5`
